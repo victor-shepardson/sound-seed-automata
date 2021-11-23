@@ -265,9 +265,9 @@ SoundSeed {
                     state, symbol);
 
                 // tricks to get more interesting machines:
-                // move = if(symbol==0){0-head.sign}{movements[move_idx]}; //symbol zero move -> center
+                move = if(symbol==0){0-head.sign}{movements[move_idx]}; //symbol zero move -> center
                 // new_symbol = if(new_symbol==0){1}{new_symbol}; // 0 is never written
-                move = movements[move_idx];
+                // move = movements[move_idx];
 
                 if (new_symbol!=0) {tape[head] = new_symbol};
                 head = head + move;
@@ -337,7 +337,7 @@ SoundSeedGarden {
             ]
         };
 
-        SynthDef(\sound_seed_mixdown, { arg outbus=0;
+        mixdown_synth = SynthDef(\sound_seed_mixdown, { arg outbus=0;
             var rms_cutoff = \rms_cutoff.ir(100);
             var max_thresh = \max_thresh.ir(0.2);
             var min_thresh = \min_thresh.ir(0.01);
@@ -374,18 +374,25 @@ SoundSeedGarden {
             // env_raw.poll(10, \raw); env_exp.poll(10, \exp);
 
             Out.ar(outbus, sig_out);
-        }).add;
+        }).play;
 
-        // this seems fragile? how can I know it's the right done message?
+      /*  // this seems fragile? how can I know it's the right done message?
         OSCFunc({ arg msg, time;
             ("This is the done message for the SynthDef.send:" + [time, msg]).postln;
             mixdown_synth = Synth.tail(server, \sound_seed_mixdown, [\outbus, outbus]);
-        }, '/done').oneShot; // remove me automatically when done
+        }, '/done').oneShot; // remove me automatically when done*/
 
         // TODO: default GVerb here, external option
-        ambience_synth = {
-            MiVerb.ar(In.ar(send_bus, 2), mul:0.05, drywet:1, time:0.1)
-        }.play(addAction:'addToTail');
+        ambience_synth = SynthDef(\sound_seed_ambience, {
+            var in = In.ar(send_bus, 2);
+            GVerb.ar(
+                Mix.new(in),
+                roomsize:50, revtime:1.5, damping:0.9, spread:5,
+                earlyreflevel: 0.0,
+                drylevel:0, mul:0.03
+        )
+            // MiVerb.ar(In.ar(send_bus, 2), mul:0.05, drywet:1, time:0.1)
+        }).play(server, outbus, addAction:'addToTail');
     }
 }
 
@@ -408,7 +415,7 @@ SoundSeedAutomata {
         seeds = Dictionary.new;
 
         SynthDef(\sound_seed_recorder, { arg inbus, soundbuf, databuf;
-            var input = SoundIn.ar(inbus, numChannelsIn);
+            var input = 2*SoundIn.ar(inbus, numChannelsIn);
             var stop = T2A.ar(\stop.tr(0));
             var phase = Phasor.ar(
                 1, BufRateScale.kr(soundbuf), start:0, end:BufFrames.kr(soundbuf));
